@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MonoGame.ImPlot.Sample</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
+
+    <!--
+      Add your preferred ImPlot.NET binding here, for example:
+        <PackageReference Include="Hexa.NET.ImPlot" Version="2.0.1" />
+      or:
+        <PackageReference Include="Twizzle.ImPlot.NET" Version="1.89.4" />
+    -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MonoGame.ImPlot\MonoGame.ImPlot.csproj" />
+  </ItemGroup>
+
+</Project>
