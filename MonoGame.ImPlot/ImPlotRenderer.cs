@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace MonoGame.ImPlot
+namespace MonoGame.ImPlotNet
 {
     /// <summary>
     /// MonoGame renderer backend for Dear ImGui (and ImPlot when used alongside it).

@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
 
     <AssemblyName>MonoGame.ImPlot</AssemblyName>
-    <RootNamespace>MonoGame.ImPlot</RootNamespace>
+    <RootNamespace>MonoGame.ImPlotNet</RootNamespace>
     <PackageId>MonoGame.ImPlot</PackageId>
     <Version>1.0.0</Version>
     <Authors>MonoGame.ImPlotNet Contributors</Authors>

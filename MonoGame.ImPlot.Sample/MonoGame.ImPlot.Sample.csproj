@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
-    <RootNamespace>MonoGame.ImPlot.Sample</RootNamespace>
+    <RootNamespace>MonoGame.ImPlotNet.Sample</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

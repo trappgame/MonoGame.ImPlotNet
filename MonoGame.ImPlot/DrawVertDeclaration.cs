@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using System.Runtime.InteropServices;
 
-namespace MonoGame.ImPlot
+namespace MonoGame.ImPlotNet
 {
     /// <summary>
     /// MonoGame VertexDeclaration matching ImGui's ImDrawVert layout:

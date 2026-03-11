@@ -10,7 +10,7 @@ using System;
 // using ImPlotNET;        // Twizzle.ImPlot.NET
 // using Hexa.NET.ImPlot;  // Hexa.NET.ImPlot
 
-namespace MonoGame.ImPlot.Sample
+namespace MonoGame.ImPlotNet.Sample
 {
     public class SampleGame : Game
     {

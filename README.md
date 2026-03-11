@@ -51,7 +51,7 @@ Reference `MonoGame.ImPlot` in your project (NuGet — coming soon, or use a pro
 ```csharp
 using ImGuiNET;
 using ImPlotNET; // or Hexa.NET.ImPlot, etc.
-using MonoGame.ImPlot;
+using MonoGame.ImPlotNet;
 
 public class MyGame : Game
 {
