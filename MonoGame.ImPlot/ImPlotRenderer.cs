@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace MonoGame.ImPlotNet
@@ -112,7 +113,9 @@ namespace MonoGame.ImPlotNet
         public virtual unsafe void RebuildFontAtlas()
         {
             var io = ImGui.GetIO();
-            io.Fonts.GetTexDataAsRGBA32(out byte* pixelData, out int width, out int height, out int bytesPerPixel);
+            byte* pixelData;
+            int width, height, bytesPerPixel;
+            io.Fonts.GetTexDataAsRGBA32(&pixelData, &width, &height, &bytesPerPixel);
 
             var pixels = new byte[width * height * bytesPerPixel];
             Marshal.Copy(new IntPtr(pixelData), pixels, 0, pixels.Length);
@@ -125,8 +128,8 @@ namespace MonoGame.ImPlotNet
 
             _fontTextureId = BindTexture(tex2d);
 
-            // ImTextureID in Hexa.NET.ImGui is ulong (ImU64) in ImGui 1.91+.
-            io.Fonts.SetTexID((ulong)_fontTextureId.Value);
+            // ImTextureID is a struct (wraps ImU64). Reinterpret our nint key as the struct.
+            io.Fonts.SetTexID(Unsafe.BitCast<ulong, ImTextureID>((ulong)(nint)_fontTextureId.Value));
             io.Fonts.ClearTexData();
         }
 
@@ -236,7 +239,7 @@ namespace MonoGame.ImPlotNet
                 Keys.Insert        => ImGuiKey.Insert,
                 Keys.Delete        => ImGuiKey.Delete,
                 >= Keys.D0 and <= Keys.D9
-                    => ImGuiKey._0 + (key - Keys.D0),
+                    => ImGuiKey.A - 10 + (key - Keys.D0),  // ImGuiKey_0 = ImGuiKey_A − 10
                 >= Keys.A and <= Keys.Z
                     => ImGuiKey.A  + (key - Keys.A),
                 >= Keys.NumPad0 and <= Keys.NumPad9
@@ -399,8 +402,8 @@ namespace MonoGame.ImPlotNet
                     if (cmd.ElemCount == 0)
                         continue;
 
-                    // cmd.TextureId is ulong (ImTextureID / ImU64) in Hexa.NET.ImGui.
-                    var texKey = (nint)(ulong)cmd.TextureId;
+                    // ImTextureID is a struct; reinterpret as ulong to recover our nint key.
+                    var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(cmd.TextureId);
                     if (!_loadedTextures.TryGetValue(texKey, out var texture))
                         throw new InvalidOperationException(
                             $"ImPlotRenderer: texture id '{texKey}' is not registered. " +
