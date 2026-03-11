@@ -23,6 +23,14 @@ namespace MonoGame.ImPlotNet
         // ── GraphicsDevice ────────────────────────────────────────────────────
         private readonly GraphicsDevice _graphicsDevice;
 
+        // ── ImGui context ─────────────────────────────────────────────────────
+        /// <summary>
+        /// The native ImGui context handle created by this renderer.
+        /// Pass this to <c>ImPlot.SetImGuiContext(ImGuiContext)</c> right after
+        /// calling <c>ImPlot.CreateContext()</c> to link the two contexts.
+        /// </summary>
+        public IntPtr ImGuiContext { get; }
+
         // ── Effect / rasterizer ───────────────────────────────────────────────
         private BasicEffect? _effect;
         private readonly RasterizerState _rasterizerState;
@@ -62,8 +70,8 @@ namespace MonoGame.ImPlotNet
         {
             _graphicsDevice = graphicsDevice ?? throw new ArgumentNullException(nameof(graphicsDevice));
 
-            var context = ImGui.CreateContext();
-            ImGui.SetCurrentContext(context);
+            ImGuiContext = ImGui.CreateContext();
+            ImGui.SetCurrentContext(ImGuiContext);
 
             _rasterizerState = new RasterizerState
             {

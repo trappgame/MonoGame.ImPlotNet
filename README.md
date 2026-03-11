@@ -68,8 +68,10 @@ public class MyGame : Game
         // 3. Build the font atlas
         _renderer.Initialize();
 
-        // 4. Create ImPlot context AFTER ImGui context
+        // 4. Create ImPlot context and link it to the ImGui context.
+        //    SetImGuiContext is required — omitting it causes AccessViolationException.
         ImPlot.CreateContext();
+        ImPlot.SetImGuiContext(_renderer.ImGuiContext);
     }
 
     protected override void Draw(GameTime gameTime)

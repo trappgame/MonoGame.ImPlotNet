@@ -57,10 +57,12 @@ namespace MonoGame.ImPlotNet.Sample
             // 3. Build the font atlas
             _imPlotRenderer.Initialize();
 
-            // 4. Create the ImPlot context AFTER ImGui context (handled inside the constructor above).
-            //    Uncomment the line below once you have added an ImPlot.NET NuGet package:
+            // 4. Create the ImPlot context and link it to the ImGui context.
+            //    Uncomment the two lines below once you have added an ImPlot.NET NuGet package.
+            //    SetImGuiContext is required — omitting it causes AccessViolationException.
             //
-            //    ImPlot.CreateContext();   // <-- uncomment when using ImPlot
+            //    ImPlot.CreateContext();
+            //    ImPlot.SetImGuiContext(_imPlotRenderer.ImGuiContext);
         }
 
         protected override void Update(GameTime gameTime)
@@ -112,10 +114,10 @@ namespace MonoGame.ImPlotNet.Sample
 
         protected override void UnloadContent()
         {
-            // Destroy ImPlot context BEFORE the renderer (which destroys ImGui context).
+            // Destroy ImPlot context BEFORE the renderer (which destroys the ImGui context).
             // Uncomment when using ImPlot:
             //
-            // ImPlot.DestroyContext();   // <-- uncomment when using ImPlot
+            // ImPlot.DestroyContext();  // must come before _imPlotRenderer.Dispose()
 
             _imPlotRenderer.Dispose();
             base.UnloadContent();
