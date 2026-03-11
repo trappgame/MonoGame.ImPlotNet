@@ -1,3 +1,4 @@
+using Hexa.NET.ImGui;
 using Microsoft.Xna.Framework.Graphics;
 using System.Runtime.InteropServices;
 
@@ -12,11 +13,11 @@ namespace MonoGame.ImPlotNet
     /// </summary>
     public static class DrawVertDeclaration
     {
-        public static readonly int Size = Marshal.SizeOf<ImGuiNET.ImDrawVert>();
+        public static readonly int Size = Marshal.SizeOf<ImDrawVert>();
 
         public static readonly VertexDeclaration Declaration = new VertexDeclaration(
             Size,
-            new VertexElement(0,  VertexElementFormat.Vector2, VertexElementUsage.Position,         0),
+            new VertexElement(0,  VertexElementFormat.Vector2, VertexElementUsage.Position,          0),
             new VertexElement(8,  VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0),
             new VertexElement(16, VertexElementFormat.Color,   VertexElementUsage.Color,             0)
         );

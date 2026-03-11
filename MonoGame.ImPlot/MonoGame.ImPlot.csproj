@@ -11,13 +11,13 @@
     <PackageId>MonoGame.ImPlot</PackageId>
     <Version>1.0.0</Version>
     <Authors>MonoGame.ImPlotNet Contributors</Authors>
-    <Description>MonoGame renderer backend for Dear ImGui (ImGui.NET) and ImPlot.NET, inspired by MonoGame.ImGuiNet.</Description>
+    <Description>MonoGame renderer backend for Dear ImGui (Hexa.NET.ImGui) and Hexa.NET.ImPlot, inspired by MonoGame.ImGuiNet.</Description>
     <PackageTags>MonoGame;ImGui;ImPlot;UI;debug;overlay</PackageTags>
     <RepositoryUrl>https://github.com/trappgame/MonoGame.ImPlotNet</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+    <PackageReference Include="Hexa.NET.ImGui" Version="2.0.1" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
   </ItemGroup>
 

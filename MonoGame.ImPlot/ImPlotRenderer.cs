@@ -1,4 +1,4 @@
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -9,11 +9,14 @@ using System.Runtime.InteropServices;
 namespace MonoGame.ImPlotNet
 {
     /// <summary>
-    /// MonoGame renderer backend for Dear ImGui (and ImPlot when used alongside it).
+    /// MonoGame renderer backend for Dear ImGui (Hexa.NET.ImGui) and ImPlot (Hexa.NET.ImPlot).
     ///
     /// ImPlot renders entirely through ImGui's draw lists, so no ImPlot-specific
-    /// rendering code is needed here. Simply call ImPlot.CreateContext() after
-    /// constructing this renderer, and ImPlot.DestroyContext() before Dispose().
+    /// rendering code is needed here. After constructing this renderer:
+    ///   1. Call Initialize() to build the font atlas.
+    ///   2. Call ImPlot.CreateContext().
+    ///   3. Call ImPlot.SetImGuiContext(renderer.ImGuiContext).
+    ///   4. On shutdown: ImPlot.DestroyContext() then renderer.Dispose().
     ///
     /// Inspired by MonoGame.ImGuiNet (https://github.com/tsMezotic/MonoGame.ImGuiNet)
     /// and the ImGui.NET XNA sample renderer.
@@ -25,11 +28,11 @@ namespace MonoGame.ImPlotNet
 
         // ── ImGui context ─────────────────────────────────────────────────────
         /// <summary>
-        /// The native ImGui context handle created by this renderer.
-        /// Pass this to <c>ImPlot.SetImGuiContext(ImGuiContext)</c> right after
-        /// calling <c>ImPlot.CreateContext()</c> to link the two contexts.
+        /// The native ImGui context created by this renderer.
+        /// Pass to <c>ImPlot.SetImGuiContext(ImGuiContext)</c> right after
+        /// <c>ImPlot.CreateContext()</c> to link the two libraries.
         /// </summary>
-        public IntPtr ImGuiContext { get; }
+        public ImGuiContextPtr ImGuiContext { get; }
 
         // ── Effect / rasterizer ───────────────────────────────────────────────
         private BasicEffect? _effect;
@@ -45,9 +48,10 @@ namespace MonoGame.ImPlotNet
         private int _indexBufferSize;
 
         // ── Texture registry ──────────────────────────────────────────────────
-        private readonly Dictionary<IntPtr, Texture2D> _loadedTextures = new();
-        private int _textureId;
-        private IntPtr? _fontTextureId;
+        // Keys are sequential nint values used as ImTextureID handles.
+        private readonly Dictionary<nint, Texture2D> _loadedTextures = new();
+        private nint _textureId;
+        private nint? _fontTextureId;
 
         // ── Input state ───────────────────────────────────────────────────────
         private int _scrollWheelValue;
@@ -60,12 +64,10 @@ namespace MonoGame.ImPlotNet
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Creates the renderer and sets up an ImGui context.
-        /// Call <see cref="Initialize"/> once the GraphicsDevice is ready,
-        /// and optionally call ImPlot.CreateContext() after this constructor.
+        /// Creates the renderer and an ImGui context.
         /// </summary>
         /// <param name="graphicsDevice">MonoGame GraphicsDevice.</param>
-        /// <param name="window">GameWindow used for text-input events.</param>
+        /// <param name="window">GameWindow — used for text-input events.</param>
         public ImPlotRenderer(GraphicsDevice graphicsDevice, GameWindow window)
         {
             _graphicsDevice = graphicsDevice ?? throw new ArgumentNullException(nameof(graphicsDevice));
@@ -86,9 +88,7 @@ namespace MonoGame.ImPlotNet
             SetupInput(window);
         }
 
-        /// <summary>
-        /// Convenience constructor accepting a <see cref="Game"/> instance.
-        /// </summary>
+        /// <summary>Convenience overload accepting a <see cref="Game"/>.</summary>
         public ImPlotRenderer(Game game)
             : this(game?.GraphicsDevice!, game?.Window!) { }
 
@@ -124,30 +124,32 @@ namespace MonoGame.ImPlotNet
                 UnbindTexture(_fontTextureId.Value);
 
             _fontTextureId = BindTexture(tex2d);
-            io.Fonts.SetTexID(_fontTextureId.Value);
+
+            // ImTextureID in Hexa.NET.ImGui is ulong (ImU64) in ImGui 1.91+.
+            io.Fonts.SetTexID((ulong)_fontTextureId.Value);
             io.Fonts.ClearTexData();
         }
 
         /// <summary>
         /// Registers a MonoGame texture with ImGui and returns a handle
-        /// suitable for <c>ImGui.Image()</c> calls.
+        /// for use with <c>ImGui.Image()</c> etc.
         /// </summary>
-        public virtual IntPtr BindTexture(Texture2D texture)
+        public virtual nint BindTexture(Texture2D texture)
         {
-            var id = new IntPtr(_textureId++);
+            var id = _textureId++;
             _loadedTextures.Add(id, texture);
             return id;
         }
 
         /// <summary>Removes a previously bound texture.</summary>
-        public virtual void UnbindTexture(IntPtr textureId)
+        public virtual void UnbindTexture(nint textureId)
         {
             _loadedTextures.Remove(textureId);
         }
 
         /// <summary>
-        /// Call at the start of your Update/Draw method.
-        /// Updates ImGui IO state and calls <c>ImGui.NewFrame()</c>.
+        /// Call at the start of your Draw method.
+        /// Updates ImGui IO and calls <c>ImGui.NewFrame()</c>.
         /// </summary>
         public virtual void BeforeLayout(GameTime gameTime)
         {
@@ -157,7 +159,7 @@ namespace MonoGame.ImPlotNet
         }
 
         /// <summary>
-        /// Call at the end of your Draw method (after all ImGui/ImPlot calls).
+        /// Call at the end of your Draw method, after all ImGui/ImPlot calls.
         /// Finalises the ImGui frame and renders it to the MonoGame back-buffer.
         /// </summary>
         public virtual void AfterLayout()
@@ -176,7 +178,7 @@ namespace MonoGame.ImPlotNet
             window.TextInput += (_, a) =>
             {
                 if (a.Character == '\t') return;
-                io.AddInputCharacter(a.Character);
+                io.AddInputCharacter((uint)a.Character);
             };
         }
 
@@ -284,12 +286,12 @@ namespace MonoGame.ImPlotNet
             _effect ??= new BasicEffect(_graphicsDevice);
 
             var io = ImGui.GetIO();
-            _effect.World             = Matrix.Identity;
-            _effect.View              = Matrix.Identity;
-            _effect.Projection        = Matrix.CreateOrthographicOffCenter(
+            _effect.World              = Matrix.Identity;
+            _effect.View               = Matrix.Identity;
+            _effect.Projection         = Matrix.CreateOrthographicOffCenter(
                 0f, io.DisplaySize.X, io.DisplaySize.Y, 0f, -1f, 1f);
-            _effect.TextureEnabled    = true;
-            _effect.Texture           = texture;
+            _effect.TextureEnabled     = true;
+            _effect.Texture            = texture;
             _effect.VertexColorEnabled = true;
 
             return _effect;
@@ -305,9 +307,9 @@ namespace MonoGame.ImPlotNet
             var lastBlendFactor  = _graphicsDevice.BlendFactor;
             var lastBlendState   = _graphicsDevice.BlendState;
 
-            _graphicsDevice.BlendFactor      = Color.White;
-            _graphicsDevice.BlendState       = BlendState.NonPremultiplied;
-            _graphicsDevice.RasterizerState  = _rasterizerState;
+            _graphicsDevice.BlendFactor       = Color.White;
+            _graphicsDevice.BlendState        = BlendState.NonPremultiplied;
+            _graphicsDevice.RasterizerState   = _rasterizerState;
             _graphicsDevice.DepthStencilState = DepthStencilState.DepthRead;
 
             drawData.ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);
@@ -334,7 +336,6 @@ namespace MonoGame.ImPlotNet
             if (drawData.TotalVtxCount == 0)
                 return;
 
-            // Grow vertex buffer if needed (1.5× growth factor)
             if (drawData.TotalVtxCount > _vertexBufferSize)
             {
                 _vertexBuffer?.Dispose();
@@ -344,7 +345,6 @@ namespace MonoGame.ImPlotNet
                 _vertexData = new byte[_vertexBufferSize * DrawVertDeclaration.Size];
             }
 
-            // Grow index buffer if needed
             if (drawData.TotalIdxCount > _indexBufferSize)
             {
                 _indexBuffer?.Dispose();
@@ -354,7 +354,6 @@ namespace MonoGame.ImPlotNet
                 _indexData = new byte[_indexBufferSize * sizeof(ushort)];
             }
 
-            // Copy ImGui draw data into managed byte arrays
             int vtxOffset = 0;
             int idxOffset = 0;
 
@@ -400,10 +399,12 @@ namespace MonoGame.ImPlotNet
                     if (cmd.ElemCount == 0)
                         continue;
 
-                    if (!_loadedTextures.TryGetValue(cmd.TextureId, out var texture))
+                    // cmd.TextureId is ulong (ImTextureID / ImU64) in Hexa.NET.ImGui.
+                    var texKey = (nint)(ulong)cmd.TextureId;
+                    if (!_loadedTextures.TryGetValue(texKey, out var texture))
                         throw new InvalidOperationException(
-                            $"ImPlotRenderer: texture with id '{cmd.TextureId}' is not registered. " +
-                            "Use BindTexture() to register MonoGame textures before passing them to ImGui/ImPlot.");
+                            $"ImPlotRenderer: texture id '{texKey}' is not registered. " +
+                            "Call BindTexture() before passing a texture handle to ImGui/ImPlot.");
 
                     _graphicsDevice.ScissorRectangle = new Rectangle(
                         (int)cmd.ClipRect.X,
@@ -419,11 +420,11 @@ namespace MonoGame.ImPlotNet
 
 #pragma warning disable CS0618
                         _graphicsDevice.DrawIndexedPrimitives(
-                            primitiveType: PrimitiveType.TriangleList,
-                            baseVertex:    (int)cmd.VtxOffset + vtxOffset,
+                            primitiveType:  PrimitiveType.TriangleList,
+                            baseVertex:     (int)cmd.VtxOffset + vtxOffset,
                             minVertexIndex: 0,
-                            numVertices:   cmdList.VtxBuffer.Size,
-                            startIndex:    (int)cmd.IdxOffset + idxOffset,
+                            numVertices:    cmdList.VtxBuffer.Size,
+                            startIndex:     (int)cmd.IdxOffset + idxOffset,
                             primitiveCount: (int)cmd.ElemCount / 3);
 #pragma warning restore CS0618
                     }

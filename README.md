@@ -1,6 +1,6 @@
 # MonoGame.ImPlotNet
 
-A MonoGame renderer backend for [Dear ImGui](https://github.com/ocornut/imgui) (via [ImGui.NET](https://github.com/ImGuiNET/ImGui.NET)) with first-class support for [ImPlot](https://github.com/epezent/implot) plotting widgets.
+A MonoGame renderer backend for [Dear ImGui](https://github.com/ocornut/imgui) and [ImPlot](https://github.com/epezent/implot), built on the [Hexa.NET.ImGui](https://github.com/HexaEngine/Hexa.NET.ImGui) / [Hexa.NET.ImPlot](https://www.nuget.org/packages/Hexa.NET.ImPlot) ecosystem.
 
 Inspired by [MonoGame.ImGuiNet](https://github.com/tsMezotic/MonoGame.ImGuiNet).
 
@@ -8,7 +8,7 @@ Inspired by [MonoGame.ImGuiNet](https://github.com/tsMezotic/MonoGame.ImGuiNet).
 
 ## How it works
 
-ImPlot renders entirely through ImGui's draw lists — meaning the MonoGame renderer code is identical whether you use ImGui alone or together with ImPlot. `ImPlotRenderer` handles:
+ImPlot renders entirely through ImGui's draw lists — the MonoGame renderer code is identical whether you use ImGui alone or together with ImPlot. `ImPlotRenderer` handles:
 
 - ImGui context creation and the full render pipeline
 - Font atlas texture upload to MonoGame's `GraphicsDevice`
@@ -16,41 +16,32 @@ ImPlot renders entirely through ImGui's draw lists — meaning the MonoGame rend
 - Dynamic vertex/index buffer management
 - Graphics state save/restore
 
-You call ImPlot context management yourself (`ImPlot.CreateContext()` / `ImPlot.DestroyContext()`), keeping the library free from any specific ImPlot NuGet binding.
+You manage the ImPlot context yourself (`ImPlot.CreateContext()` / `ImPlot.DestroyContext()`).
+
+> **Why Hexa.NET?**
+> `Hexa.NET.ImGui` and `Hexa.NET.ImPlot` ship the *same* native `cimgui` binaries and use matching C# types. Mixing `ImGui.NET` (mellinoe) with `Hexa.NET.ImPlot` causes DLL conflicts and `AccessViolationException`. Use one ecosystem consistently.
 
 ---
 
 ## Installation
 
-### 1. Add the library
-
-Reference `MonoGame.ImPlot` in your project (NuGet — coming soon, or use a project reference).
-
-### 2. Add ImGui.NET
+### NuGet packages required
 
 ```xml
-<PackageReference Include="ImGui.NET" Version="1.91.6.1" />
-```
-
-### 3. Add an ImPlot.NET binding of your choice
-
-| Package | NuGet ID |
-|---|---|
-| Hexa.NET.ImPlot (recommended) | `Hexa.NET.ImPlot` |
-| Twizzle.ImPlot.NET | `Twizzle.ImPlot.NET` |
-
-```xml
-<!-- Example with Hexa.NET.ImPlot -->
+<PackageReference Include="Hexa.NET.ImGui"  Version="2.0.1" />
 <PackageReference Include="Hexa.NET.ImPlot" Version="2.0.1" />
+<PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
 ```
+
+Then add a project (or NuGet) reference to `MonoGame.ImPlot`.
 
 ---
 
 ## Quick start
 
 ```csharp
-using ImGuiNET;
-using ImPlotNET; // or Hexa.NET.ImPlot, etc.
+using Hexa.NET.ImGui;
+using Hexa.NET.ImPlot;
 using MonoGame.ImPlotNet;
 
 public class MyGame : Game
@@ -59,16 +50,16 @@ public class MyGame : Game
 
     protected override void LoadContent()
     {
-        // 1. Create the renderer (creates ImGui context internally)
+        // 1. Create renderer (creates the ImGui context internally).
         _renderer = new ImPlotRenderer(GraphicsDevice, Window);
 
-        // 2. Optionally add custom fonts before Initialize()
-        // ImGui.GetIO().Fonts.AddFontFromFileTTF("font.ttf", 16);
+        // 2. Optionally load custom fonts before Initialize():
+        //    ImGui.GetIO().Fonts.AddFontFromFileTTF("font.ttf", 16);
 
-        // 3. Build the font atlas
+        // 3. Build the font atlas.
         _renderer.Initialize();
 
-        // 4. Create ImPlot context and link it to the ImGui context.
+        // 4. Create the ImPlot context and link it to the ImGui context.
         //    SetImGuiContext is required — omitting it causes AccessViolationException.
         ImPlot.CreateContext();
         ImPlot.SetImGuiContext(_renderer.ImGuiContext);
@@ -80,7 +71,7 @@ public class MyGame : Game
 
         _renderer.BeforeLayout(gameTime);
 
-        // --- your ImGui / ImPlot calls go here ---
+        // ── Your ImGui / ImPlot calls go here ──────────────────────────────
         ImGui.Begin("My Window");
         if (ImPlot.BeginPlot("My Plot"))
         {
@@ -90,16 +81,15 @@ public class MyGame : Game
             ImPlot.EndPlot();
         }
         ImGui.End();
-        // -----------------------------------------
+        // ───────────────────────────────────────────────────────────────────
 
         _renderer.AfterLayout();
-
         base.Draw(gameTime);
     }
 
     protected override void UnloadContent()
     {
-        ImPlot.DestroyContext(); // destroy ImPlot BEFORE ImGui
+        ImPlot.DestroyContext();  // must come before renderer.Dispose()
         _renderer.Dispose();
         base.UnloadContent();
     }
@@ -110,14 +100,12 @@ public class MyGame : Game
 
 ## Binding textures
 
-To display MonoGame textures inside ImGui windows (e.g. `ImGui.Image()`):
-
 ```csharp
 // Register
-IntPtr handle = _renderer.BindTexture(myTexture2D);
+nint handle = _renderer.BindTexture(myTexture2D);
 
 // Use in ImGui
-ImGui.Image(handle, new Vector2(myTexture2D.Width, myTexture2D.Height));
+ImGui.Image((ulong)handle, new Vector2(myTexture2D.Width, myTexture2D.Height));
 
 // Unregister when no longer needed
 _renderer.UnbindTexture(handle);
@@ -129,10 +117,10 @@ _renderer.UnbindTexture(handle);
 
 ```
 MonoGame.ImPlotNet/
-├── MonoGame.ImPlot/          ← Renderer library (no ImPlot package dependency)
+├── MonoGame.ImPlot/          ← Renderer library (Hexa.NET.ImGui + MonoGame)
 │   ├── ImPlotRenderer.cs
 │   └── DrawVertDeclaration.cs
-└── MonoGame.ImPlot.Sample/   ← Demo app showing ImGui + ImPlot usage
+└── MonoGame.ImPlot.Sample/   ← Demo app (Hexa.NET.ImGui + Hexa.NET.ImPlot)
     └── SampleGame.cs
 ```
 
@@ -142,5 +130,5 @@ MonoGame.ImPlotNet/
 
 - .NET 8.0
 - MonoGame 3.8.1 (DesktopGL or WindowsDX)
-- ImGui.NET 1.91.6+
-- Any ImPlot.NET binding (optional — library works as a pure ImGui renderer too)
+- Hexa.NET.ImGui 2.0.1+
+- Hexa.NET.ImPlot 2.0.1+

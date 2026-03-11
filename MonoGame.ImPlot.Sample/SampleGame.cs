@@ -1,14 +1,9 @@
-using ImGuiNET;
+using Hexa.NET.ImGui;
+using Hexa.NET.ImPlot;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
-
-// If you have added an ImPlot NuGet package (e.g. Hexa.NET.ImPlot or Twizzle.ImPlot.NET),
-// uncomment the appropriate using statement below and the ImPlot calls in this file.
-//
-// using ImPlotNET;        // Twizzle.ImPlot.NET
-// using Hexa.NET.ImPlot;  // Hexa.NET.ImPlot
 
 namespace MonoGame.ImPlotNet.Sample
 {
@@ -17,7 +12,7 @@ namespace MonoGame.ImPlotNet.Sample
         private GraphicsDeviceManager _graphics;
         private ImPlotRenderer _imPlotRenderer = null!;
 
-        // Sample data for the ImPlot demo (used when ImPlot is enabled)
+        // Sample data for the sine-wave plot
         private readonly double[] _plotX = new double[100];
         private readonly double[] _plotY = new double[100];
 
@@ -37,7 +32,6 @@ namespace MonoGame.ImPlotNet.Sample
         {
             base.Initialize();
 
-            // Build sample sine-wave data
             for (int i = 0; i < _plotX.Length; i++)
             {
                 _plotX[i] = i * 0.1;
@@ -47,22 +41,19 @@ namespace MonoGame.ImPlotNet.Sample
 
         protected override void LoadContent()
         {
-            // 1. Create the renderer (also creates the ImGui context internally)
+            // 1. Create the renderer (also creates the ImGui context).
             _imPlotRenderer = new ImPlotRenderer(GraphicsDevice, Window);
 
-            // 2. Optionally load custom fonts here before Initialize():
-            //    var io = ImGui.GetIO();
-            //    io.Fonts.AddFontFromFileTTF("path/to/font.ttf", 16);
+            // 2. Optionally load custom fonts before Initialize():
+            //    ImGui.GetIO().Fonts.AddFontFromFileTTF("path/to/font.ttf", 16);
 
-            // 3. Build the font atlas
+            // 3. Build the font atlas.
             _imPlotRenderer.Initialize();
 
             // 4. Create the ImPlot context and link it to the ImGui context.
-            //    Uncomment the two lines below once you have added an ImPlot.NET NuGet package.
             //    SetImGuiContext is required — omitting it causes AccessViolationException.
-            //
-            //    ImPlot.CreateContext();
-            //    ImPlot.SetImGuiContext(_imPlotRenderer.ImGuiContext);
+            ImPlot.CreateContext();
+            ImPlot.SetImGuiContext(_imPlotRenderer.ImGuiContext);
         }
 
         protected override void Update(GameTime gameTime)
@@ -84,29 +75,16 @@ namespace MonoGame.ImPlotNet.Sample
             ImGui.ShowDemoWindow();
 
             // ── ImPlot demo window ──────────────────────────────────────────
-            // Uncomment the block below once you have added an ImPlot.NET package
-            // and called ImPlot.CreateContext() in LoadContent().
-            //
-            // ImGui.Begin("ImPlot Demo");
-            // if (ImPlot.BeginPlot("Sine Wave"))
-            // {
-            //     ImPlot.SetupAxes("x", "sin(x)");
-            //     ImPlot.PlotLine("sin", ref _plotX[0], ref _plotY[0], _plotX.Length);
-            //     ImPlot.EndPlot();
-            // }
-            // ImGui.End();
-
-            // ── Custom window example ───────────────────────────────────────
-            ImGui.Begin("MonoGame.ImPlot");
-            ImGui.Text("Hello from MonoGame.ImPlot!");
-            ImGui.Separator();
-            ImGui.TextWrapped(
-                "Add an ImPlot.NET NuGet package to your project (e.g. Hexa.NET.ImPlot " +
-                "or Twizzle.ImPlot.NET), call ImPlot.CreateContext() in LoadContent(), " +
-                "then uncomment the ImPlot demo block in Draw().");
+            ImGui.Begin("ImPlot Demo");
+            if (ImPlot.BeginPlot("Sine Wave"))
+            {
+                ImPlot.SetupAxes("x", "sin(x)");
+                ImPlot.PlotLine("sin", ref _plotX[0], ref _plotY[0], _plotX.Length);
+                ImPlot.EndPlot();
+            }
             ImGui.End();
 
-            // ── ImGui frame end (renders everything) ───────────────────────
+            // ── ImGui frame end (renders everything) ────────────────────────
             _imPlotRenderer.AfterLayout();
 
             base.Draw(gameTime);
@@ -115,10 +93,7 @@ namespace MonoGame.ImPlotNet.Sample
         protected override void UnloadContent()
         {
             // Destroy ImPlot context BEFORE the renderer (which destroys the ImGui context).
-            // Uncomment when using ImPlot:
-            //
-            // ImPlot.DestroyContext();  // must come before _imPlotRenderer.Dispose()
-
+            ImPlot.DestroyContext();
             _imPlotRenderer.Dispose();
             base.UnloadContent();
         }
