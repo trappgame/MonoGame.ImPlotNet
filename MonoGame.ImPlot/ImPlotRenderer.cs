@@ -14,7 +14,7 @@ namespace MonoGame.ImPlotNet
     ///
     /// ImPlot renders entirely through ImGui's draw lists, so no ImPlot-specific
     /// rendering code is needed here. After constructing this renderer:
-    ///   1. Call Initialize() to build the font atlas.
+    ///   1. Call Initialize() to signal that the backend is ready.
     ///   2. Call ImPlot.CreateContext().
     ///   3. Call ImPlot.SetImGuiContext(renderer.ImGuiContext).
     ///   4. On shutdown: ImPlot.DestroyContext() then renderer.Dispose().
@@ -52,7 +52,6 @@ namespace MonoGame.ImPlotNet
         // Keys are sequential nint values used as ImTextureID handles.
         private readonly Dictionary<nint, Texture2D> _loadedTextures = new();
         private nint _textureId;
-        private nint? _fontTextureId;
 
         // ── Input state ───────────────────────────────────────────────────────
         private int _scrollWheelValue;
@@ -76,6 +75,10 @@ namespace MonoGame.ImPlotNet
             ImGuiContext = ImGui.CreateContext();
             ImGui.SetCurrentContext(ImGuiContext);
 
+            // Tell ImGui that this backend handles texture lifecycle via ImDrawData.Textures.
+            // This replaces the old GetTexDataAsRGBA32 / SetTexID font-atlas API (removed in 1.92+).
+            ImGui.GetIO().BackendFlags |= ImGuiBackendFlags.RendererHasTextures;
+
             _rasterizerState = new RasterizerState
             {
                 CullMode             = CullMode.None,
@@ -94,12 +97,15 @@ namespace MonoGame.ImPlotNet
             : this(game?.GraphicsDevice!, game?.Window!) { }
 
         /// <summary>
-        /// Builds the font atlas texture. Call once after construction
-        /// (and after loading any custom fonts into ImGui.GetIO().Fonts).
+        /// Kept for API compatibility. With <c>ImGuiBackendFlags.RendererHasTextures</c>
+        /// the font atlas is built and uploaded automatically on the first frame.
+        /// Call this after loading custom fonts into <c>ImGui.GetIO().Fonts</c> if
+        /// you want to trigger a rebuild before the first frame.
         /// </summary>
         public virtual void Initialize()
         {
-            RebuildFontAtlas();
+            // Nothing to do — font atlas texture creation is driven by the
+            // ImDrawData.Textures WantCreate/WantDestroy lifecycle below.
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -107,30 +113,15 @@ namespace MonoGame.ImPlotNet
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Rebuilds the ImGui font atlas and uploads it to the GPU.
-        /// Call this after adding or changing fonts.
+        /// Kept for API compatibility. With the RendererHasTextures backend flag the
+        /// font atlas is rebuilt automatically by ImGui when fonts change. Call after
+        /// adding custom fonts to request an immediate rebuild on the next frame.
         /// </summary>
-        public virtual unsafe void RebuildFontAtlas()
+        public virtual void RebuildFontAtlas()
         {
-            var io = ImGui.GetIO();
-            byte* pixelData;
-            int width, height, bytesPerPixel;
-            io.Fonts.GetTexDataAsRGBA32(&pixelData, &width, &height, &bytesPerPixel);
-
-            var pixels = new byte[width * height * bytesPerPixel];
-            Marshal.Copy(new IntPtr(pixelData), pixels, 0, pixels.Length);
-
-            var tex2d = new Texture2D(_graphicsDevice, width, height, false, SurfaceFormat.Color);
-            tex2d.SetData(pixels);
-
-            if (_fontTextureId.HasValue)
-                UnbindTexture(_fontTextureId.Value);
-
-            _fontTextureId = BindTexture(tex2d);
-
-            // ImTextureID is a struct (wraps ImU64). Reinterpret our nint key as the struct.
-            io.Fonts.SetTexID(Unsafe.BitCast<ulong, ImTextureID>((ulong)(nint)_fontTextureId.Value));
-            io.Fonts.ClearTexData();
+            // ImGui 1.92+ (Hexa.NET.ImGui 2.2+): GetTexDataAsRGBA32 / SetTexID are removed.
+            // The backend flag ImGuiBackendFlags.RendererHasTextures causes ImGui to
+            // manage the font atlas texture via ImDrawData.Textures automatically.
         }
 
         /// <summary>
@@ -300,6 +291,56 @@ namespace MonoGame.ImPlotNet
             return _effect;
         }
 
+        /// <summary>
+        /// Processes a single <see cref="ImTextureDataPtr"/> entry from
+        /// <c>ImDrawData.Textures</c>. Handles WantCreate, WantUpdates, and WantDestroy.
+        /// </summary>
+        private unsafe void UpdateTexture(ImTextureDataPtr tex)
+        {
+            if (tex.Status == ImTextureStatus.Ok)
+                return;
+
+            if (tex.Status == ImTextureStatus.WantCreate)
+            {
+                int sizeInBytes = tex.Width * tex.Height * tex.BytesPerPixel;
+                var pixels = new byte[sizeInBytes];
+                Marshal.Copy((IntPtr)tex.GetPixels(), pixels, 0, pixels.Length);
+
+                var texture = new Texture2D(_graphicsDevice, tex.Width, tex.Height, false, SurfaceFormat.Color);
+                texture.SetData(pixels);
+
+                var id = _textureId++;
+                _loadedTextures.Add(id, texture);
+
+                tex.SetTexID(Unsafe.BitCast<ulong, ImTextureID>((ulong)(nint)id));
+                tex.SetStatus(ImTextureStatus.Ok);
+            }
+            else if (tex.Status == ImTextureStatus.WantUpdates)
+            {
+                // Full re-upload on any atlas update (e.g. new glyphs loaded at runtime).
+                var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(tex.GetTexID());
+                if (_loadedTextures.TryGetValue(texKey, out var existingTexture))
+                {
+                    int sizeInBytes = tex.Width * tex.Height * tex.BytesPerPixel;
+                    var pixels = new byte[sizeInBytes];
+                    Marshal.Copy((IntPtr)tex.GetPixels(), pixels, 0, pixels.Length);
+                    existingTexture.SetData(pixels);
+                }
+                tex.SetStatus(ImTextureStatus.Ok);
+            }
+            else if (tex.Status == ImTextureStatus.WantDestroy)
+            {
+                var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(tex.GetTexID());
+                if (_loadedTextures.TryGetValue(texKey, out var existingTexture))
+                {
+                    existingTexture.Dispose();
+                    _loadedTextures.Remove(texKey);
+                }
+                tex.SetTexID(default);
+                tex.SetStatus(ImTextureStatus.Destroyed);
+            }
+        }
+
         private unsafe void RenderDrawData(ImDrawDataPtr drawData)
         {
             // Save graphics state
@@ -321,6 +362,14 @@ namespace MonoGame.ImPlotNet
                 0, 0,
                 _graphicsDevice.PresentationParameters.BackBufferWidth,
                 _graphicsDevice.PresentationParameters.BackBufferHeight);
+
+            // Process any pending texture creates / updates / destroys.
+            var textures = drawData.Textures;
+            if (textures.Size > 0)
+            {
+                for (int i = 0; i < textures.Size; i++)
+                    UpdateTexture(textures[i]);
+            }
 
             UpdateBuffers(drawData);
             RenderCommandLists(drawData);
@@ -383,7 +432,7 @@ namespace MonoGame.ImPlotNet
             _indexBuffer!.SetData(_indexData,   0, drawData.TotalIdxCount * sizeof(ushort));
         }
 
-        private void RenderCommandLists(ImDrawDataPtr drawData)
+        private unsafe void RenderCommandLists(ImDrawDataPtr drawData)
         {
             _graphicsDevice.SetVertexBuffer(_vertexBuffer);
             _graphicsDevice.Indices = _indexBuffer;
@@ -402,8 +451,10 @@ namespace MonoGame.ImPlotNet
                     if (cmd.ElemCount == 0)
                         continue;
 
-                    // ImTextureID is a struct; reinterpret as ulong to recover our nint key.
-                    var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(cmd.TextureId);
+                    // Recover our nint key from the ImTextureID stored in the draw command.
+                    // cmd.GetTexID() resolves through ImTextureRef (handles both direct IDs
+                    // and backend-managed ImTextureData pointers).
+                    var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(cmd.GetTexID());
                     if (!_loadedTextures.TryGetValue(texKey, out var texture))
                         throw new InvalidOperationException(
                             $"ImPlotRenderer: texture id '{texKey}' is not registered. " +
@@ -448,12 +499,6 @@ namespace MonoGame.ImPlotNet
         {
             if (_disposed) return;
             _disposed = true;
-
-            if (_fontTextureId.HasValue)
-            {
-                UnbindTexture(_fontTextureId.Value);
-                _fontTextureId = null;
-            }
 
             _effect?.Dispose();
             _vertexBuffer?.Dispose();

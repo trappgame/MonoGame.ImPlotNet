@@ -28,8 +28,8 @@ You manage the ImPlot context yourself (`ImPlot.CreateContext()` / `ImPlot.Destr
 ### NuGet packages required
 
 ```xml
-<PackageReference Include="Hexa.NET.ImGui"  Version="2.0.1" />
-<PackageReference Include="Hexa.NET.ImPlot" Version="2.0.1" />
+<PackageReference Include="Hexa.NET.ImGui"  Version="2.2.9" />
+<PackageReference Include="Hexa.NET.ImPlot" Version="2.2.9" />
 <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
 ```
 
