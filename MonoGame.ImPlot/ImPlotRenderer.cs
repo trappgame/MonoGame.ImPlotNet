@@ -51,7 +51,7 @@ namespace MonoGame.ImPlotNet
         // ── Texture registry ──────────────────────────────────────────────────
         // Keys are sequential nint values used as ImTextureID handles.
         private readonly Dictionary<nint, Texture2D> _loadedTextures = new();
-        private nint _textureId;
+        private nint _textureId = 1;  // 0 == ImTextureID_Invalid in ImGui 1.92; never use 0 as a texture key
 
         // ── Input state ───────────────────────────────────────────────────────
         private int _scrollWheelValue;
@@ -364,12 +364,11 @@ namespace MonoGame.ImPlotNet
                 _graphicsDevice.PresentationParameters.BackBufferHeight);
 
             // Process any pending texture creates / updates / destroys.
-            var textures = drawData.Textures;
-            if (textures.Size > 0)
-            {
-                for (int i = 0; i < textures.Size; i++)
-                    UpdateTexture(textures[i]);
-            }
+            // Use PlatformIO.Textures (inline ImVector) rather than drawData.Textures
+            // (which is a C++ pointer — unsafe to dereference via the C# ptr-wrapper).
+            var platformTextures = ImGui.GetPlatformIO().Textures;
+            for (int i = 0; i < platformTextures.Size; i++)
+                UpdateTexture(platformTextures[i]);
 
             UpdateBuffers(drawData);
             RenderCommandLists(drawData);
@@ -456,9 +455,7 @@ namespace MonoGame.ImPlotNet
                     // and backend-managed ImTextureData pointers).
                     var texKey = (nint)Unsafe.BitCast<ImTextureID, ulong>(cmd.GetTexID());
                     if (!_loadedTextures.TryGetValue(texKey, out var texture))
-                        throw new InvalidOperationException(
-                            $"ImPlotRenderer: texture id '{texKey}' is not registered. " +
-                            "Call BindTexture() before passing a texture handle to ImGui/ImPlot.");
+                        continue;  // texture not ready yet (e.g. first-frame WantCreate race); skip
 
                     _graphicsDevice.ScissorRectangle = new Rectangle(
                         (int)cmd.ClipRect.X,
